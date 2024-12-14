@@ -1,0 +1,4 @@
+.mypy_cache
+store
+venv
+**/__pycache__

@@ -1,0 +1,1 @@
+../maelstrom/maelstrom test -w echo --bin ./src/echo.py --nodes n1 --time-limit 10 --log-stderr
