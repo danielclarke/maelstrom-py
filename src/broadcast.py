@@ -53,7 +53,7 @@ def handle_message(node: BroadcastNode, req: dict) -> None:
 
                 def ack(response: dict) -> None:
                     if response.get("body", {}).get("type") == "broadcast_ok":
-                        unacked.remove(response.get("src"))
+                        unacked.remove(response["src"])
 
                 while unacked:
                     for n in unacked:
@@ -64,7 +64,7 @@ def handle_message(node: BroadcastNode, req: dict) -> None:
             raise Exception(f"Unknown message type {t}")
 
 
-def run_():
+def run():
     node = BroadcastNode()
     # files=["-"] means read from sys.stdin
 
@@ -74,19 +74,15 @@ def run_():
         handler = None
         if msg_id := req.get("body", {}).get("in_reply_to"):
             callback = node.callbacks.pop(msg_id)
-            handler = lambda: callback(response=req)
+            handler = lambda: callback(req)
         else:
             handler = lambda: handle_message(node=node, req=req)
 
         Thread(target=handler).start()
 
 
-def run():
-    try:
-        run_()
-    except KeyboardInterrupt:
-        return
-
-
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except KeyboardInterrupt:
+        exit()

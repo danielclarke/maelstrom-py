@@ -1,7 +1,14 @@
 import json
 import sys
-from threading import Semaphore
+from threading import Semaphore, Thread
+from time import sleep
 from typing import Callable
+
+
+class Task:
+    def __init__(self, dt_s: float, f: Callable[[], None]):
+        self.dt_s = dt_s
+        self.f = f
 
 
 class Node:
@@ -10,6 +17,7 @@ class Node:
         self.node_ids = []
         self.next_msg_id = 0
         self.callbacks: dict[int, Callable[[dict], None]] = {}
+        self.tasks: list[Task] = []
         self.lock = Semaphore()
 
     def init(self, node_id: str, node_ids: list[str]) -> None:
@@ -35,7 +43,7 @@ class Node:
             "msg_id": self.next_msg_id,
             "in_reply_to": req.get("body", {}).get("msg_id"),
         }
-        self.send(dest=req.get("src"), body=body_)
+        self.send(dest=req["src"], body=body_)
 
     def send(self, dest: str, body: dict):
         msg = {"src": self.node_id, "dest": dest, "body": body}
@@ -58,3 +66,16 @@ class Node:
             "msg_id": self.next_msg_id,
         }
         self.send(dest=dest, body=body_)
+
+    def repeat(self, dt_s: float, f: Callable[[], None]) -> None:
+        self.tasks.append(Task(dt_s=dt_s, f=f))
+
+    def run_tasks(self) -> None:
+        for t in self.tasks:
+
+            def repeater() -> None:
+                while True:
+                    t.f()
+                    sleep(t.dt_s)
+
+            Thread(target=repeater).start()

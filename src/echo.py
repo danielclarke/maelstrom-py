@@ -6,7 +6,7 @@ import json
 from node import Node
 
 
-def run_():
+def run():
     node = Node()
     # files=["-"] means read from sys.stdin
     for line in fileinput.input(files=["-"]):
@@ -27,12 +27,8 @@ def run_():
                 raise Exception(f"Unknown message type {t}")
 
 
-def run():
-    try:
-        run_()
-    except KeyboardInterrupt:
-        return
-
-
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except KeyboardInterrupt:
+        exit()
