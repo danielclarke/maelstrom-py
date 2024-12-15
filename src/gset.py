@@ -3,38 +3,59 @@
 import fileinput
 import json
 from threading import Thread
+from typing import Any
 
 from node import Node
+
+
+class GSet:
+    def __init__(self, s: set | None = None):
+        if s is None:
+            self.data = set()
+        else:
+            self.data = s.copy()
+
+    @staticmethod
+    def from_array(values: list) -> "GSet":
+        return GSet(set(values))
+
+    def to_array(self) -> list:
+        return list(self.data)
+
+    def read(self) -> list:
+        return list(self.data)
+
+    def merge(self, values: list) -> "GSet":
+        return GSet(self.data.union(values))
+
+    def add(self, element: Any) -> "GSet":
+        return GSet(self.data.union([element]))
 
 
 class GSetServer(Node):
     def __init__(self):
         super().__init__()
-        self.data = set()
+        self.crdt = GSet()
 
     def init(self, node_id, node_ids):
         super().init(node_id, node_ids)
 
         def sync():
-            try:
-                self.lock.acquire()
-                data = list(self.data)
-            finally:
-                self.lock.release()
-
             for id in filter(lambda x: x != self.node_id, self.node_ids):
-                self.send(dest=id, body={"type": "replicate", "value": data})
+                self.send(
+                    dest=id, body={"type": "replicate", "value": self.crdt.read()}
+                )
 
-        self.repeat(dt_s=1, f=sync)
+        self.repeat(dt_s=5, f=sync)
         self.run_tasks()
 
     def read(self, req: dict) -> None:
-        self.reply(req=req, body={"type": "read_ok", "value": list(self.data)})
+        self.reply(req=req, body={"type": "read_ok", "value": self.crdt.read()})
 
     def add(self, req: dict) -> None:
         try:
             self.lock.acquire()
-            self.data.add(req["body"]["element"])
+            self.crdt = self.crdt.add(req["body"]["element"])
         finally:
             self.lock.release()
         self.reply(req=req, body={"type": "add_ok"})
@@ -42,7 +63,7 @@ class GSetServer(Node):
     def replicate(self, req: dict) -> None:
         try:
             self.lock.acquire()
-            self.data.update(req["body"]["value"])
+            self.crdt = self.crdt.merge(req["body"]["value"])
         finally:
             self.lock.release()
 
