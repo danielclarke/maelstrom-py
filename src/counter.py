@@ -9,30 +9,6 @@ from crdt import CRDT
 from node import Node
 
 
-class GSet:
-    def __init__(self, s: set | None = None):
-        if s is None:
-            self.data = set()
-        else:
-            self.data = s.copy()
-
-    @staticmethod
-    def from_serializable(value: list) -> "GSet":
-        return GSet(set(value))
-
-    def to_serializable(self) -> list:
-        return list(self.data)
-
-    def read(self) -> list:
-        return list(self.data)
-
-    def merge(self, value: list) -> "GSet":
-        return GSet(self.data.union(value))
-
-    def add(self, element: Any) -> "GSet":
-        return GSet(self.data.union([element]))
-
-
 class Counter:
     def __init__(self, value: dict | None = None):
         if value is None:
@@ -86,12 +62,16 @@ class CRDTServer(Node):
         self.run_tasks()
 
     def read(self, req: dict) -> None:
-        self.reply(req=req, body={"type": "read_ok", "value": self.crdt.read()})
+        self.reply(
+            req=req, body={"type": "read_ok", "value": sum(self.crdt.read().values())}
+        )
 
     def add(self, req: dict) -> None:
         try:
             self.lock.acquire()
-            self.crdt = self.crdt.add(req["body"]["element"])
+            self.crdt = self.crdt.add(
+                {"node_id": req["src"], "delta": req["body"]["delta"]}
+            )
         finally:
             self.lock.release()
         self.reply(req=req, body={"type": "add_ok"})
@@ -123,7 +103,7 @@ class CRDTServer(Node):
 
 
 def run():
-    node = CRDTServer(crdt=GSet())
+    node = CRDTServer(crdt=Counter())
 
     for line in fileinput.input(files=["-"]):
         req = json.loads(line)
