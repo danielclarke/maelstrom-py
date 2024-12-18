@@ -41,6 +41,39 @@ class GCounter:
         return type(self)(result)
 
 
+class PNCounter:
+    def __init__(self, *, inc: GCounter | None = None, dec: GCounter | None = None):
+        self.inc = inc or GCounter()
+        self.dec = dec or GCounter()
+
+    @staticmethod
+    def from_serializable(value: dict) -> "PNCounter":
+        return PNCounter(
+            inc=GCounter.from_serializable(value["inc"]),
+            dec=GCounter.from_serializable(value["dec"]),
+        )
+
+    def to_serializable(self) -> dict:
+        return {"inc": self.inc.to_serializable(), "dec": self.dec.to_serializable()}
+
+    def read(self) -> int:
+        return self.inc.read() - self.dec.read()
+
+    def merge(self, other: Self) -> Self:
+        return type(self)(inc=self.inc.merge(other.inc), dec=self.dec.merge(other.dec))
+
+    def add(self, element: dict) -> Self:
+        if 0 <= element["delta"]:
+            return type(self)(inc=self.inc.add(element=element), dec=self.dec)
+        else:
+            return type(self)(
+                inc=self.inc,
+                dec=self.dec.add(
+                    element={"node_id": element["node_id"], "delta": -element["delta"]}
+                ),
+            )
+
+
 class CRDTServer(Node):
     def __init__(self, crdt: CRDT):
         super().__init__()
@@ -101,7 +134,7 @@ class CRDTServer(Node):
 
 
 def run():
-    node = CRDTServer(crdt=GCounter())
+    node = CRDTServer(crdt=PNCounter())
 
     for line in fileinput.input(files=["-"]):
         req = json.loads(line)

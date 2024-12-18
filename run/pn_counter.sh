@@ -1,0 +1,1 @@
+../maelstrom/maelstrom test -w pn-counter --bin ./src/pn_counter.py --time-limit 20 --rate 10 --log-stderr
