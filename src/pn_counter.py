@@ -7,6 +7,7 @@ from typing import Self
 
 from crdt import CRDT
 from node import Node
+from semaphore_context import lock
 
 
 class GCounter:
@@ -96,23 +97,17 @@ class CRDTServer(Node):
         self.reply(req=req, body={"type": "read_ok", "value": self.crdt.read()})
 
     def add(self, req: dict) -> None:
-        try:
-            self.lock.acquire()
+        with lock(self.lock):
             self.crdt = self.crdt.add(
                 {"node_id": req["src"], "delta": req["body"]["delta"]}
             )
-        finally:
-            self.lock.release()
         self.reply(req=req, body={"type": "add_ok"})
 
     def replicate(self, req: dict) -> None:
-        try:
-            self.lock.acquire()
+        with lock(self.lock):
             self.crdt = self.crdt.merge(
                 self.crdt.from_serializable(req["body"]["value"])
             )
-        finally:
-            self.lock.release()
 
     def handle_message(self, req: dict) -> None:
         match req.get("body", {}).get("type"):

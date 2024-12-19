@@ -4,6 +4,8 @@ from threading import Semaphore, Thread
 from time import sleep
 from typing import Callable
 
+from semaphore_context import lock
+
 
 class Task:
     def __init__(self, dt_s: float, f: Callable[[], None]):
@@ -24,19 +26,16 @@ class Node:
         self.node_id = node_id
         self.node_ids = node_ids
 
+    def handle_message(self, req: dict) -> None:
+        raise NotImplementedError
+
     def log(self, msg: str):
-        try:
-            self.lock.acquire()
+        with lock(self.lock):
             print(msg, file=sys.stderr, flush=True)
-        finally:
-            self.lock.release()
 
     def reply(self, req: dict, body: dict) -> None:
-        try:
-            self.lock.acquire()
+        with lock(self.lock):
             self.next_msg_id += 1
-        finally:
-            self.lock.release()
 
         body_ = {
             **body,
@@ -47,19 +46,13 @@ class Node:
 
     def send(self, dest: str, body: dict):
         msg = {"src": self.node_id, "dest": dest, "body": body}
-        try:
-            self.lock.acquire()
+        with lock(self.lock):
             print(json.dumps(msg), flush=True)
-        finally:
-            self.lock.release()
 
     def rpc(self, dest: str, body: dict, handler: Callable[[dict], None]) -> None:
-        try:
-            self.lock.acquire()
+        with lock(self.lock):
             self.next_msg_id += 1
             self.callbacks[self.next_msg_id] = handler
-        finally:
-            self.lock.release()
 
         body_ = {
             **body,
