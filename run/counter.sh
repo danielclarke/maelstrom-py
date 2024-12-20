@@ -1,1 +1,0 @@
-../maelstrom/maelstrom test -w g-counter --bin ./src/counter.py --time-limit 20 --rate 10 --log-stderr

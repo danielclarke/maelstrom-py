@@ -3,70 +3,76 @@
 import fileinput
 import json
 from threading import Thread
-from typing import Any
+from typing import Self
 
-from crdt import CRDT
-from node import Node
-from semaphore_context import lock
-
-
-class GSet:
-    def __init__(self, s: set | None = None):
-        if s is None:
-            self.data = set()
-        else:
-            self.data = s.copy()
-
-    @staticmethod
-    def from_serializable(value: list) -> "GSet":
-        return GSet(set(value))
-
-    def to_serializable(self) -> list:
-        return list(self.data)
-
-    def read(self) -> list:
-        return list(self.data)
-
-    def merge(self, value: list) -> "GSet":
-        return GSet(self.data.union(value))
-
-    def add(self, element: Any) -> "GSet":
-        return GSet(self.data.union([element]))
+from lib.crdt import CRDT
+from lib.node import Node
+from lib.semaphore_context import lock
 
 
-class Counter:
+class GCounter:
     def __init__(self, value: dict | None = None):
-        if value is None:
-            self.data = {}
-        else:
-            self.data = value
+        self.data = value or {}
 
     @staticmethod
-    def from_serializable(value: dict) -> "Counter":
-        return Counter(value)
+    def from_serializable(value: dict) -> "GCounter":
+        return GCounter(value)
 
     def to_serializable(self) -> dict:
         return self.data
 
-    def read(self) -> dict:
-        return self.data
+    def read(self) -> int:
+        return sum(self.data.values())
 
-    def merge(self, value: dict) -> "Counter":
+    def merge(self, other: Self) -> Self:
         result = self.data.copy()
 
-        for k, v in value.items():
+        for k, v in other.data.items():
             result[k] = max(result.get(k, 0), v)
 
-        return Counter(result)
+        return type(self)(result)
 
-    def add(self, element: dict) -> "Counter":
+    def add(self, element: dict) -> Self:
         result = self.data.copy()
 
         result[element["node_id"]] = (
             result.get(element["node_id"], 0) + element["delta"]
         )
 
-        return Counter(result)
+        return type(self)(result)
+
+
+class PNCounter:
+    def __init__(self, *, inc: GCounter | None = None, dec: GCounter | None = None):
+        self.inc = inc or GCounter()
+        self.dec = dec or GCounter()
+
+    @staticmethod
+    def from_serializable(value: dict) -> "PNCounter":
+        return PNCounter(
+            inc=GCounter.from_serializable(value["inc"]),
+            dec=GCounter.from_serializable(value["dec"]),
+        )
+
+    def to_serializable(self) -> dict:
+        return {"inc": self.inc.to_serializable(), "dec": self.dec.to_serializable()}
+
+    def read(self) -> int:
+        return self.inc.read() - self.dec.read()
+
+    def merge(self, other: Self) -> Self:
+        return type(self)(inc=self.inc.merge(other.inc), dec=self.dec.merge(other.dec))
+
+    def add(self, element: dict) -> Self:
+        if 0 <= element["delta"]:
+            return type(self)(inc=self.inc.add(element=element), dec=self.dec)
+        else:
+            return type(self)(
+                inc=self.inc,
+                dec=self.dec.add(
+                    element={"node_id": element["node_id"], "delta": -element["delta"]}
+                ),
+            )
 
 
 class CRDTServer(Node):
@@ -80,7 +86,8 @@ class CRDTServer(Node):
         def sync():
             for id in filter(lambda x: x != self.node_id, self.node_ids):
                 self.send(
-                    dest=id, body={"type": "replicate", "value": self.crdt.read()}
+                    dest=id,
+                    body={"type": "replicate", "value": self.crdt.to_serializable()},
                 )
 
         self.repeat(dt_s=5, f=sync)
@@ -91,12 +98,16 @@ class CRDTServer(Node):
 
     def add(self, req: dict) -> None:
         with lock(self.lock):
-            self.crdt = self.crdt.add(req["body"]["element"])
+            self.crdt = self.crdt.add(
+                {"node_id": req["src"], "delta": req["body"]["delta"]}
+            )
         self.reply(req=req, body={"type": "add_ok"})
 
     def replicate(self, req: dict) -> None:
         with lock(self.lock):
-            self.crdt = self.crdt.merge(req["body"]["value"])
+            self.crdt = self.crdt.merge(
+                self.crdt.from_serializable(req["body"]["value"])
+            )
 
     def handle_message(self, req: dict) -> None:
         match req.get("body", {}).get("type"):
@@ -118,7 +129,7 @@ class CRDTServer(Node):
 
 
 def run():
-    node = CRDTServer(crdt=GSet())
+    node = CRDTServer(crdt=PNCounter())
 
     for line in fileinput.input(files=["-"]):
         req = json.loads(line)

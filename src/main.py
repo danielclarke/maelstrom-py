@@ -2,12 +2,16 @@ import argparse
 import sys
 from enum import StrEnum
 
-from src import echo
+from lib import broadcast, datomic, echo, g_counter, g_set, pn_counter
 
 
 class Workbench(StrEnum):
-    ECHO = "echo"
     BROADCAST = "broadcast"
+    DATOMIC = "datomic"
+    ECHO = "echo"
+    G_COUNTER = "g_counter"
+    G_SET = "g_set"
+    PN_COUNTER = "pn_counter"
 
 
 def make_parser():
@@ -24,12 +28,19 @@ def make_parser():
 
 
 def main(workbench: Workbench):
-    print(f"running {workbench}")
     match workbench:
+        case Workbench.BROADCAST:
+            broadcast.run()
+        case Workbench.DATOMIC:
+            datomic.run()
         case Workbench.ECHO:
             echo.run()
-        case Workbench.BROADCAST:
-            pass
+        case Workbench.G_COUNTER:
+            g_counter.run()
+        case Workbench.G_SET:
+            g_set.run()
+        case Workbench.PN_COUNTER:
+            pn_counter.run()
 
 
 if __name__ == "__main__":

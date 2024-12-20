@@ -5,6 +5,6 @@ if __name__ == "__main__":
     from main import main
 
     try:
-        main("datomic")
+        main("g_counter")
     except KeyboardInterrupt:
         exit()

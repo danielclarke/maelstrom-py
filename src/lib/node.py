@@ -4,7 +4,7 @@ from threading import Semaphore, Thread
 from time import sleep
 from typing import Callable
 
-from semaphore_context import lock
+from lib.semaphore_context import lock
 
 
 class Task:
