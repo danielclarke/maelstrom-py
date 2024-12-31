@@ -2,9 +2,9 @@
 
 if __name__ == "__main__":
 
-    from main import main
+    from main import Workbench, main
 
     try:
-        main("datomic")
+        main(Workbench.DATOMIC)
     except KeyboardInterrupt:
         exit()

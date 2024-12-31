@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 import sys
 from threading import Semaphore, Thread
@@ -27,6 +28,9 @@ class Node:
         self.node_ids = node_ids
 
     def handle_message(self, req: dict) -> None:
+        raise NotImplementedError
+
+    async def handle_message_async(self, req: dict) -> None:
         raise NotImplementedError
 
     def log(self, msg: str):
@@ -59,6 +63,12 @@ class Node:
             "msg_id": self.next_msg_id,
         }
         self.send(dest=dest, body=body_)
+
+    async def sync_rpc(self, dest: str, body: dict) -> dict:
+        f: concurrent.futures.Future = concurrent.futures.Future()
+        self.rpc(dest=dest, body=body, handler=lambda resp: f.set_result(resp))
+        concurrent.futures.wait([f], timeout=5)
+        return f.result()
 
     def repeat(self, dt_s: float, f: Callable[[], None]) -> None:
         self.tasks.append(Task(dt_s=dt_s, f=f))

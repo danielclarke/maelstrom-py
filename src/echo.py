@@ -2,9 +2,9 @@
 
 if __name__ == "__main__":
 
-    from main import main
+    from main import Workbench, main
 
     try:
-        main("echo")
+        main(Workbench.ECHO)
     except KeyboardInterrupt:
         exit()

@@ -2,9 +2,9 @@
 
 if __name__ == "__main__":
 
-    from main import main
+    from main import Workbench, main
 
     try:
-        main("broadcast")
+        main(Workbench.BROADCAST)
     except KeyboardInterrupt:
         exit()
